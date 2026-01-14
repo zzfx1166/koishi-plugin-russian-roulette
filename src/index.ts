@@ -1,4 +1,5 @@
 import { Context, Schema } from 'koishi'
+import {setEngine} from "node:crypto";
 declare module 'koishi' {
   interface Tables {
     russiandata:usergold
@@ -83,6 +84,19 @@ export function apply(ctx: Context, config: Config) {
       return '贪心的人是不会有好运的...'
     }
     return '数据查询失败'
+  });
+  ctx.command('russian.mycoin',"查询自己的金币").alias('我的金币').action(async({session})=>
+  {
+    let usernow=await getuser(session.userId,session.channelId,ctx);
+    if(usernow)
+    {
+      await ctx.database.upsert('russiandata', [usernow]);
+      return `你现在有${usernow.gold}枚金币`;
+    }
+    else
+    {
+      return '数据库查询失败';
+    }
   });
 
 }
