@@ -14,8 +14,24 @@ export interface usergold {
   id: string
   time: Date
   gold:number
+  channel:string
 }
-
+async function getuser(userid:string,channelid:string,ctx:Context):Promise<usergold>
+{
+  let unid=`${userid}:${channelid}`;
+  let users=await ctx.database.get('russiandata',unid);
+  let usernow:usergold;
+  if(users.length==0)
+  {
+    let now=new Date();
+    usernow={id:unid,time:new Date(1949,10,1),gold:100,channel:channelid};
+  }
+  else
+  {
+    usernow=users[0];
+  }
+  return usernow;
+}
 export const Config: Schema<Config> = Schema.object({
   daylygold: Schema.number().default(100).description('每日获得最多金币量')
 })
@@ -27,7 +43,8 @@ export function apply(ctx: Context, config: Config) {
     // 各字段的类型声明
     id: 'string',
     time: 'timestamp',
-    gold: 'unsigned'
+    gold: 'unsigned',
+    channel: 'string'
   })
   ctx.command("russian.help","俄罗斯轮盘帮助").alias('俄罗斯轮盘帮助').action(async({session})=>
   {
@@ -36,30 +53,12 @@ export function apply(ctx: Context, config: Config) {
   });
   ctx.command("russian.dayly","每日签到").alias('轮盘签到').action(async ({session})=>  // 添加 async
   {
-    let addcoin=getRandomInt(config.daylygold)+1;  // 使用小写 config
+    let addcoin=getRandomInt(config.daylygold)+1;
     const userId = session.userId
     const channelId = session.channelId
-    const uniqueId = `${userId}:${channelId}`
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-
-    // 使用 await 等待数据库查询结果
-    const users = await ctx.database.get('russiandata', {id: uniqueId})
-    let usernow
-
-    if(!users || users.length === 0)
-    {
-      usernow = {
-        id: uniqueId,
-        gold: -100
-      }
-    }
-    else
-    {
-      usernow = users[0]
-    }
-
-    // 检查 usernow 是否存在，然后检查时间
+    let usernow=await getuser(userId, channelId,ctx);
     if(usernow && (usernow.gold === -100 || !usernow.time || new Date(usernow.time).getTime() < today.getTime()))
     {
       if(usernow.gold === -100)
@@ -68,15 +67,8 @@ export function apply(ctx: Context, config: Config) {
       }
       usernow.time = today;
       usernow.gold += addcoin;
-
-      // 保存到数据库
-      // if(users && users.length > 0) {
-      //   await ctx.database.set('russiandata', {id: uniqueId}, usernow)
-      // } else {
-      //   await ctx.database.create('russiandata', usernow)
-      // }
-      users[0]=usernow;
-      ctx.database.upsert('russiandata',users);
+      let users=[usernow];
+      await ctx.database.upsert('russiandata', users);
       if(getRandomInt(2) === 1)
       {
         return `这是今天的钱，祝你好运...\n你获得了${addcoin}金币!`
@@ -90,8 +82,7 @@ export function apply(ctx: Context, config: Config) {
     {
       return '贪心的人是不会有好运的...'
     }
-
     return '数据查询失败'
   });
-  
+
 }
