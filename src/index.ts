@@ -1,13 +1,16 @@
-import { Context, Schema } from 'koishi'
+import { Context, Schema,h } from 'koishi'
 import {setEngine} from "node:crypto";
 declare module 'koishi' {
   interface Tables {
     russiandata:usergold
   }
 }
-
+function parseIdFromString(input: string): string | null {
+  const match = input.match(/^.*:([A-Za-z0-9]+)$/);
+  return match ? match[1] : null;
+}
 export const name = 'russian-roulette'
-export const inject = ['database']
+export const inject = ['database','console']
 export interface Config {
   daylygold:number
 }
@@ -55,7 +58,7 @@ export function apply(ctx: Context, config: Config) {
   ctx.command("russian.dayly","每日签到").alias('轮盘签到').action(async ({session})=>  // 添加 async
   {
     let addcoin=getRandomInt(config.daylygold)+1;
-    const userId = session.userId
+    const userId = `${session.platform}:${session.userId}`
     const channelId = session.channelId
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -87,7 +90,8 @@ export function apply(ctx: Context, config: Config) {
   });
   ctx.command('russian.mycoin',"查询自己的金币").alias('我的金币').action(async({session})=>
   {
-    let usernow=await getuser(session.userId,session.channelId,ctx);
+    // console.log(`${session.platform}:${session.userId}`);
+    let usernow=await getuser(`${session.platform}:${session.userId}`,session.channelId,ctx);
     if(usernow)
     {
       await ctx.database.upsert('russiandata', [usernow]);
@@ -98,5 +102,18 @@ export function apply(ctx: Context, config: Config) {
       return '数据库查询失败';
     }
   });
-
+  ctx.command("russian.querycoin <userat:user>","查询别人金币数量").action(async({session},userat)=>
+  {
+    console.log(parseIdFromString(userat));
+    let usernow=await getuser(userat,session.channelId,ctx);
+    if(usernow)
+    {
+      await ctx.database.upsert('russiandata', [usernow]);
+      return `${h('at',{id:parseIdFromString(userat)})}的金币数量是${usernow.gold}`;
+    }
+    else
+    {
+      return '数据库查询失败或用户不存在';
+    }
+  });
 }
