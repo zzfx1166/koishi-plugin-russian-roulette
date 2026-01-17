@@ -162,19 +162,6 @@ export function apply(ctx: Context, config: Config) {
       return '数据库查询失败';
     }
   });
-  ctx.command("russian.querycoin <userat:user>","查询别人金币数量").action(async({session},userat)=>
-  {
-    let usernow=await getuser(userat,`${session.platform}:${session.channelId}`,ctx);
-    if(usernow)
-    {
-      await ctx.database.upsert('russiandata', [usernow]);
-      return `${h('at',{id:parseIdFromString(userat)})}的金币数量是${usernow.gold}`;
-    }
-    else
-    {
-      return '数据库查询失败或用户不存在';
-    }
-  });
   ctx.command("russian.duel [fire:number] [inputCoin:number] [userat:user]","发起轮盘对决").alias('装弹').action(async({session},fire,inputCoin,userat)=>
   {
     let groupDuel=await getDuel(`${session.platform}:${session.channelId}`,ctx);
@@ -247,12 +234,6 @@ export function apply(ctx: Context, config: Config) {
     }
     await ctx.database.upsert('russianDuel', [groupDuel]);
     return null;
-  });
-  ctx.command('russian.duel.cancel','强制取消对决').action(async({session})=>{
-    let groupduel=await getDuel(`${session.platform}:${session.channelId}`,ctx);
-    groupduel.status=0;
-    await ctx.database.upsert('russianDuel', [groupduel]);
-    return '已取消';
   });
   ctx.command('russian.duel.accept','接受对决').alias('接受对决').action(async({session})=>
   {
