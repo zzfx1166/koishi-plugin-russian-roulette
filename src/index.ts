@@ -57,7 +57,7 @@ async function getDuel(channelid:string,ctx:Context):Promise<duel>
     if(duelnow.timestart&&(duelnow.status==2||duelnow.status==3))
     {
       let nowtime=new Date();
-      if(nowtime.getTime()-duelnow.timestart.getTime()>180000)duelnow.status=0;
+      if(nowtime.getTime()-duelnow.timestart.getTime()>=30000)duelnow.status=0;
     }
   }
   return duelnow;
@@ -79,7 +79,7 @@ async function getuser(userid:string,channelid:string,ctx:Context):Promise<userg
 }
 export const Config: Schema<Config> = Schema.object({
   daylygold: Schema.number().default(100).description('每日获得最多金币量'),
-  maxGold:Schema.number().default(200).description('对决最大金币量')
+  maxGold:Schema.number().default(1000).description('对决最大金币量')
 })
 function getRandomInt(max) {
   return Math.floor(Math.random() * max);
@@ -112,7 +112,7 @@ export function apply(ctx: Context, config: Config) {
 
   ctx.command("russian.help","俄罗斯轮盘帮助").alias('俄罗斯轮盘帮助').action(async({session})=>
   {
-    await session.send("俄罗斯轮盘帮助：\n开启游戏：装弹 [子弹数] ?[金额](默认200金币) ?[at](指定决斗对象，为空则所有群友都可接受决斗)\示例：装弹 1 10\n接受对决：接受对决/拒绝决斗\n开始对决：开枪 ?[子弹数](默认1)（轮流开枪，根据子弹数量连开N枪械，分钟未开枪另一方可使用‘结算’命令结束对决并胜利）\n结算：结算（当某一方3分钟未开枪，可使用该命令强行结束对决并胜利）\n我的战绩：我的战绩\n排行榜：金币排行/胜场排行/败场排行/欧洲人排行/慈善家排行\n【注：同一时间群内只能有一场对决】");
+    await session.send("俄罗斯轮盘帮助：\n开启游戏：装弹 [子弹数] ?[金额](默认200金币) ?[at](指定决斗对象，为空则所有群友都可接受决斗)\示例：装弹 1 10\n接受对决：接受对决/拒绝决斗\n开始对决：开枪 ?[子弹数](默认1)（轮流开枪，根据子弹数量连开N枪械，分钟未开枪另一方可使用‘结算’命令结束对决并胜利）\n结算：结算（当某一方1分钟未开枪，可使用该命令强行结束对决并胜利）\n我的战绩：我的战绩\n排行榜：金币排行/胜场排行/败场排行/欧洲人排行/慈善家排行\n【注：同一时间群内只能有一场对决】");
     return null;
   });
   ctx.command("russian.dayly","每日签到").alias('轮盘签到').action(async ({session})=>  // 添加 async
@@ -210,22 +210,39 @@ export function apply(ctx: Context, config: Config) {
     {
       return '金币不合法';
     }
+    let user1=await getuser(`${session.platform}:${session.userId}`,`${session.platform}:${session.channelId}`,ctx);
+    if(user1.gold<coin)
+    {
+      return `${h('at',{id:session.userId})} 你没有足够的钱支撑起这场挑战`;
+    }
     groupDuel.user1=`${session.platform}:${session.userId}`;
     groupDuel.diePlace=getRandomInt(7-nfire)+1;
     groupDuel.nowPlace=1;
     groupDuel.round=1;
     groupDuel.gold=coin;
+    groupDuel.shot=nfire;
     groupDuel.timestart=new Date();
+    let fires:string='';
+    for(let i=1;i<=nfire;i++)
+    {
+      fires=fires+'咔，';
+    }
+    fires=fires+`装填完毕\n挑战金额：${groupDuel.gold}\n第一枪的概率为${roundToDecimal(groupDuel.shot/(7-groupDuel.nowPlace)*100,2)}%`;
     if(userat)
     {
+      let usernow=await getuser(userat,`${session.platform}:${session.channelId}`,ctx);
+      if(usernow.gold<coin)
+      {
+        return '你邀请的人金币不足!';
+      }
       groupDuel.user2=userat;
       groupDuel.status=2;
-      await session.send(`${h('at',{id:session.userId})}向${h('at',{id:parseIdFromString(userat)})}发起了决斗!\n请${h('at',{id:parseIdFromString(userat)})}在三分钟内回复‘接受对决’ or ‘拒绝对决’，超时此次决斗作废！`);
+      await session.send(fires+`\n${h('at',{id:session.userId})}向${h('at',{id:parseIdFromString(userat)})}发起了决斗!\n请${h('at',{id:parseIdFromString(userat)})}在30秒内回复‘接受对决’ or ‘拒绝对决’，超时此次决斗作废！`);
     }
     else
     {
       groupDuel.status=3;
-      await session.send(`若3分钟内无人接受挑战则此次对决作废【首次游玩请发送 ’俄罗斯轮盘帮助‘ 来查看命令】`);
+      await session.send(fires+`\n若30秒内无人接受挑战则此次对决作废【首次游玩请发送 ’俄罗斯轮盘帮助‘ 来查看命令】`);
     }
     await ctx.database.upsert('russianDuel', [groupDuel]);
     return null;
@@ -239,8 +256,13 @@ export function apply(ctx: Context, config: Config) {
   ctx.command('russian.duel.accept','接受对决').alias('接受对决').action(async({session})=>
   {
     let groupDuel=await getDuel(`${session.platform}:${session.channelId}`,ctx);
-    if(groupDuel.status==2)
+    if(groupDuel.status==3)
     {
+      let user11=await getuser(`${session.platform}:${session.userId}`,`${session.platform}:${session.channelId}`,ctx);
+      if(user11.gold<groupDuel.gold)
+      {
+        return `${h('at',{id:session.userId})} 你没有足够的钱支撑起这场挑战`;
+      }
       groupDuel.status=1;
       groupDuel.user2=`${session.platform}:${session.userId}`;
       let user1=await getuser(`${session.platform}:${parseIdFromString(groupDuel.user1)}`,`${session.platform}:${session.channelId}`,ctx),user2=await getuser(`${session.platform}:${parseIdFromString(groupDuel.user2)}`,`${session.platform}:${session.channelId}`,ctx);
@@ -250,7 +272,7 @@ export function apply(ctx: Context, config: Config) {
       await ctx.database.upsert('russianDuel', [groupDuel]);
       return `${h('at',{id:session.userId})}接受了对决!\n请${h('at',{id:parseIdFromString(groupDuel.user1)})}先开枪!`;
     }
-    else if(groupDuel.status==3)
+    else if(groupDuel.status==2)
     {
       if(groupDuel.user2==`${session.platform}:${session.userId}`)
       {
@@ -296,7 +318,7 @@ export function apply(ctx: Context, config: Config) {
     if(((groupDuel.round==1&&groupDuel.user1==user)||(groupDuel.round==2&&groupDuel.user2==user)))
     {
       groupDuel.nowPlace+=shot;
-      if(groupDuel.nowPlace>=groupDuel.diePlace)
+      if(groupDuel.nowPlace>groupDuel.diePlace)
       {
         if(groupDuel.round==2)
         {
@@ -306,11 +328,11 @@ export function apply(ctx: Context, config: Config) {
         // let user2=await getuser(session.platform,session.userId,ctx),user1=await getuser(session.platform,parseIdFromString(groupDuel.user2),ctx);
         await ctx.database.upsert('russianDuel', [groupDuel]);
         let winuser=await getuser(`${session.platform}:${parseIdFromString(groupDuel.user2)}`,`${session.platform}:${session.channelId}`,ctx),loseuser=await getuser(`${session.platform}:${session.userId}`,`${session.platform}:${session.channelId}`,ctx);
-        winuser.gold+=groupDuel.gold*2;
-        winuser.winGold+=groupDuel.gold;
+        winuser.gold=winuser.gold+(groupDuel.gold*2);
+        winuser.winGold=groupDuel.gold+winuser.winGold;
         winuser.winRound++;
-        loseuser.loseGold+=groupDuel.gold;
-        loseuser.loseGold++;
+        loseuser.loseGold=groupDuel.gold+loseuser.loseGold;
+        loseuser.loseRound++;
         await ctx.database.upsert('russiandata', [winuser, loseuser]);
         let dieWord:string,rnd=getRandomInt(3);
         if(rnd==0)
@@ -325,7 +347,7 @@ export function apply(ctx: Context, config: Config) {
         {
           dieWord='"嘭！"，你直接去世了';
         }
-        await session.send(`${h('at',{id:loseuser.name})} ${dieWord}\n第${groupDuel.diePlace}发子弹送走了你`);
+        await session.send(`${h('at',{id:session.userId})} ${dieWord}\n第${groupDuel.diePlace}发子弹送走了你`);
         await session.send(`这场对决是 ${winuser.name} 获胜了`);
         return `结算：\n`+
           `\t胜者：${winuser.name}\n`+
