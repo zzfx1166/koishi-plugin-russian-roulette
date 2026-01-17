@@ -1,5 +1,4 @@
 import { Context, Schema,h } from 'koishi'
-import {setEngine} from "node:crypto";
 declare module 'koishi' {
   interface Tables {
     russiandata:usergold
