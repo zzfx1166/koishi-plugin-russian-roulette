@@ -224,7 +224,7 @@ export function apply(ctx: Context, config: Config) {
       }
       groupDuel.user2=userat;
       groupDuel.status=2;
-      await session.send(fires+`\n${h('at',{id:session.userId})}向${h('at',{id:parseIdFromString(userat)})}发起了决斗!\n请${h('at',{id:parseIdFromString(userat)})}在30秒内回复‘接受对决’ or ‘拒绝对决’，超时此次决斗作废！`);
+      await session.send(`${fires}\n${h('at',{id:session.userId})}向${h('at',{id:parseIdFromString(userat)})}发起了决斗!\n请${h('at',{id:parseIdFromString(userat)})}在30秒内回复‘接受对决’ or ‘拒绝对决’，超时此次决斗作废！`);
     }
     else
     {
