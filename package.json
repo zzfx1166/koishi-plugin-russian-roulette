@@ -1,7 +1,7 @@
 {
   "name": "@ctyaqa/koishi-plugin-russian-roulette",
   "description": "俄罗斯轮盘赌(金币版)",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
